@@ -1,0 +1,1004 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#111719">
+  <title>Pulsebound — by Kosuke</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #111719;
+      --panel: #1c2526;
+      --paper: #f0f1df;
+      --muted: #98a6a0;
+      --lime: #d7ff57;
+      --coral: #ff795c;
+      --line: rgba(240, 241, 223, .13);
+    }
+    * { box-sizing: border-box; }
+    body {
+      min-width: 320px;
+      min-height: 100vh;
+      margin: 0;
+      background: var(--ink);
+      color: var(--paper);
+      font-family: "Trebuchet MS", "Arial Narrow", sans-serif;
+    }
+    button, input { font: inherit; }
+    button { color: inherit; }
+    .shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: minmax(330px, .78fr) minmax(0, 1.22fr);
+    }
+    .shell.is-playing { display: block; width: 100%; height: 100dvh; min-height: 0; }
+    .shell.is-playing .entry { display: none; }
+    .shell.is-playing .play-area { width: 100%; height: 100dvh; min-height: 0; padding: clamp(12px, 2vw, 26px); }
+    .shell:fullscreen { background: var(--ink); }
+    .entry {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: clamp(24px, 5vw, 72px);
+      border-right: 1px solid var(--line);
+      background:
+        radial-gradient(ellipse at 0% 100%, rgba(255,121,92,.13), transparent 46%),
+        radial-gradient(ellipse at 90% 0%, rgba(215,255,87,.08), transparent 38%),
+        var(--ink);
+    }
+    .wordmark { color: var(--lime); font-size: 13px; font-weight: 900; letter-spacing: .16em; text-transform: uppercase; }
+    .entry-main { width: min(100%, 390px); margin: auto 0; padding: 54px 0; }
+    .kicker { margin: 0 0 17px; color: var(--coral); font-size: 11px; font-weight: 800; letter-spacing: .19em; text-transform: uppercase; }
+    h1 { margin: 0; font-size: clamp(48px, 6vw, 78px); line-height: .9; letter-spacing: -.055em; text-transform: uppercase; }
+    h1 span { display: block; color: var(--lime); }
+    .intro { max-width: 330px; margin: 24px 0 34px; color: #b4c0b8; font-size: 15px; line-height: 1.65; }
+    .field-label { display: block; margin: 0 0 9px; color: var(--paper); font-size: 12px; font-weight: 800; }
+    .name-input {
+      width: 100%; height: 50px; padding: 0 15px; border: 1px solid #485454; border-radius: 3px;
+      outline: none; background: #182021; color: var(--paper); font-size: 15px;
+    }
+    .name-input:focus { border-color: var(--lime); box-shadow: 0 0 0 3px rgba(215,255,87,.12); }
+    .start-button {
+      display: flex; width: 100%; min-height: 52px; align-items: center; justify-content: space-between;
+      margin-top: 12px; padding: 0 17px; border: 0; border-radius: 3px; background: var(--lime);
+      color: #151a14; cursor: pointer; font-size: 13px; font-weight: 900; letter-spacing: .09em; text-transform: uppercase;
+      transition: background .15s, transform .15s;
+    }
+    .start-button:hover { background: #e5ff91; transform: translateY(-1px); }
+    .start-button:focus-visible, .icon-button:focus-visible { outline: 2px solid var(--paper); outline-offset: 3px; }
+    .credit { color: var(--muted); font-size: 12px; }
+    .credit strong { color: var(--paper); }
+    .play-area { min-width: 0; display: flex; flex-direction: column; padding: clamp(18px, 3vw, 42px); }
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 38px; }
+    .top-label { color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+    .player { display: none; align-items: center; gap: 9px; color: var(--paper); font-size: 13px; }
+    .player.visible { display: flex; }
+    .player-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 12px rgba(215,255,87,.6); }
+    .game-frame { position: relative; display: flex; flex: 1; min-height: 0; align-items: center; justify-content: center; margin-top: 14px; overflow: hidden; border: 1px solid var(--line); border-radius: 4px; background: #161e1f; touch-action: none; }
+    canvas { display: block; width: 100%; height: 100%; position: absolute; inset: 0; }
+    .move-controls { position: absolute; z-index: 2; left: 15px; bottom: 15px; display: none; gap: 9px; }
+    .move-button { width: 54px; height: 54px; border: 1px solid rgba(240,241,223,.42); border-radius: 4px; background: rgba(240,241,223,.13); color: rgba(240,241,223,.78); cursor: pointer; font-size: 25px; font-weight: 800; line-height: 1; backdrop-filter: blur(3px); touch-action: none; user-select: none; }
+    .move-button:active, .move-button.is-held { border-color: rgba(215,255,87,.8); background: rgba(215,255,87,.2); color: var(--lime); }
+    .overlay { position: absolute; z-index: 1; inset: 0; display: grid; place-content: center; justify-items: center; padding: 24px; text-align: center; background: rgba(17,23,25,.25); }
+    .overlay[hidden] { display: none; }
+    .overlay-kicker { margin: 0 0 11px; color: var(--lime); font-size: 11px; font-weight: 900; letter-spacing: .2em; text-transform: uppercase; }
+    .overlay-title { margin: 0; font-size: clamp(30px, 5vw, 54px); line-height: 1; letter-spacing: -.04em; text-transform: uppercase; }
+    .overlay-copy { max-width: 320px; margin: 14px 0 0; color: #c2cdc4; font-size: 14px; line-height: 1.5; }
+    .hud { display: flex; justify-content: space-between; gap: 15px; padding: 16px 2px 0; }
+    .hud-cell { display: flex; flex-direction: column; gap: 5px; }
+    .hud-cell:last-child { text-align: right; }
+    .hud-label { color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+    .hud-value { color: var(--paper); font-size: 20px; font-weight: 900; font-variant-numeric: tabular-nums; }
+    .hud-value em { color: var(--lime); font-size: 13px; font-style: normal; }
+    .game-credit {
+      position: absolute;
+      right: 18px;
+      bottom: 18px;
+      z-index: 2;
+      padding: 7px 10px 6px;
+      border: 1px solid rgba(240,241,223,.18);
+      border-radius: 999px;
+      background: rgba(17,23,25,.4);
+      backdrop-filter: blur(4px);
+      color: rgba(240,241,223,.8);
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: .22em;
+      text-transform: uppercase;
+    }
+    .game-credit strong { color: var(--lime); }
+    .controls { display: flex; align-items: center; justify-content: space-between; gap: 15px; padding-top: 19px; }
+    .hint { color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .icon-button { min-width: 42px; height: 40px; border: 1px solid var(--line); border-radius: 3px; background: transparent; color: var(--paper); cursor: pointer; font-size: 17px; }
+    .icon-button:hover { border-color: var(--lime); color: var(--lime); }
+    .top-actions { display: flex; align-items: center; gap: 9px; }
+    .text-button { min-height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 3px; background: transparent; color: var(--paper); cursor: pointer; font-size: 10px; font-weight: 900; letter-spacing: .12em; }
+    .text-button:hover { border-color: var(--lime); color: var(--lime); }
+    .shell.is-playing .top-label { color: var(--lime); }
+    .shell.is-playing .game-frame { min-height: 0; border: 0; border-radius: 0; }
+    .shell.is-playing #move-controls { display: flex; }
+    .shell.is-playing.wave-mode #move-controls { display: none; }
+    .shell.is-playing .controls { padding-bottom: env(safe-area-inset-bottom); }
+    .shell.is-playing .hint { color: #d0d9d1; }
+    @media (max-width: 760px) {
+      .shell { grid-template-columns: 1fr; }
+      .entry { min-height: 0; padding: 24px; border-right: 0; border-bottom: 1px solid var(--line); }
+      .entry-main { width: min(100%, 460px); padding: 39px 0 28px; }
+      h1 { font-size: clamp(48px, 13vw, 70px); }
+      .intro { margin: 17px 0 22px; }
+      .play-area { min-height: 430px; padding: 18px 20px 24px; }
+      .game-frame { min-height: 290px; }
+    }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; } }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="entry" aria-labelledby="game-title">
+      <div class="wordmark">K / Studio</div>
+      <div class="entry-main">
+        <p class="kicker">A one-button rhythm run</p>
+        <h1 id="game-title">Pulse<span>bound</span></h1>
+        <p class="intro">Find the beat. Clear the gaps. Keep your run alive for one more measure.</p>
+        <form id="sign-in-form">
+          <label class="field-label" for="player-name">Player name</label>
+          <input class="name-input" id="player-name" name="playerName" maxlength="18" autocomplete="nickname" placeholder="What should we call you?" required>
+          <button class="start-button" type="submit"><span>Sign in &amp; play</span><span aria-hidden="true">↗</span></button>
+        </form>
+      </div>
+      <div class="credit">An original arcade game <strong>by Kosuke</strong></div>
+    </section>
+
+    <section class="play-area" aria-label="Game area">
+      <header class="topbar">
+        <span class="top-label" id="phase-label">Endless run / 01</span>
+        <div class="top-actions">
+          <span class="player" id="player-badge"><span class="player-dot"></span><span id="player-display"></span></span>
+          <button class="icon-button" id="fullscreen" type="button" aria-label="Toggle fullscreen" title="Toggle fullscreen">⛶</button>
+          <button class="text-button" id="menu" type="button">Menu</button>
+        </div>
+      </header>
+      <div class="game-frame" id="game-frame">
+        <canvas id="game" aria-label="Pulsebound block-jump game"></canvas>
+        <div class="game-credit">by <strong>Kosuke</strong></div>
+        <div class="move-controls" id="move-controls" aria-label="Movement controls">
+          <button class="move-button" id="move-left" type="button" aria-label="Move left" title="Hold to move left">&#x2190;</button>
+          <button class="move-button" id="move-right" type="button" aria-label="Move right" title="Hold to move right">&#x2192;</button>
+        </div>
+        <div class="overlay" id="overlay">
+          <p class="overlay-kicker">Ready when you are</p>
+          <h2 class="overlay-title">Your run<br>starts here</h2>
+          <p class="overlay-copy">Sign in with a player name to jump in. Your best run stays on this device.</p>
+        </div>
+      </div>
+      <div class="hud" aria-live="polite">
+        <div class="hud-cell"><span class="hud-label">Distance</span><span class="hud-value"><span id="score">0000</span> <em>m</em></span></div>
+        <div class="hud-cell"><span class="hud-label">Best</span><span class="hud-value"><span id="best">0000</span> <em>m</em></span></div>
+      </div>
+      <div class="controls">
+        <div class="hint" id="control-hint">HOLD SPACE / HOLD THE FIELD<br>Jump from block to block.</div>
+        <button class="icon-button" id="restart" type="button" aria-label="Restart run" title="Restart run">↻</button>
+      </div>
+    </section>
+  </main>
+  <script>
+    (() => {
+      const canvas = document.querySelector('#game');
+      const context = canvas.getContext('2d');
+      const shell = document.querySelector('.shell');
+      const frame = document.querySelector('#game-frame');
+      const form = document.querySelector('#sign-in-form');
+      const nameInput = document.querySelector('#player-name');
+      const overlay = document.querySelector('#overlay');
+      const scoreLabel = document.querySelector('#score');
+      const bestLabel = document.querySelector('#best');
+      const playerBadge = document.querySelector('#player-badge');
+      const playerDisplay = document.querySelector('#player-display');
+      const restartButton = document.querySelector('#restart');
+      const fullscreenButton = document.querySelector('#fullscreen');
+      const menuButton = document.querySelector('#menu');
+      const phaseLabel = document.querySelector('#phase-label');
+      const controlHint = document.querySelector('#control-hint');
+      const moveLeftButton = document.querySelector('#move-left');
+      const moveRightButton = document.querySelector('#move-right');
+      const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+      let width = 800;
+      let height = 440;
+      let running = false;
+      let started = false;
+      let dead = false;
+      let mode = 'cube';
+      let gravityDirection = 1;
+      let inputHeld = false;
+      let moveDirection = 0;
+      let backgroundOffset = 0;
+      let heldDirections = new Set();
+      let transitionTime = 0;
+      let portalTransition = null;
+      let waveTrail = [];
+      let score = 0;
+      let best = Number(localStorage.getItem('pulsebound-best') || 0);
+      let speed = 300;
+      let lastTime = 0;
+      let spawnIn = 1.2;
+      let platformSpawnIn = 1.2;
+      let floorGapSpawnIn = 3.2;
+      let gravityPortalSpawnIn = 3.4;
+      let obstacles = [];
+      let platforms = [];
+      let floorGaps = [];
+      let gravityPortals = [];
+      let roofSpikes = [];
+      let spikes = [];
+      let enemies = [];
+      let spikeSpawnIn = 2.1;
+      let particles = [];
+      let playerName = localStorage.getItem('pulsebound-player') || '';
+      const player = { x: 92, y: 0, size: 28, velocity: 0, grounded: true, rotation: 0 };
+      const floorY = () => height - 62;
+
+      bestLabel.textContent = String(best).padStart(4, '0');
+      if (playerName) {
+        nameInput.value = playerName;
+        setPlayer(playerName);
+        overlay.innerHTML = '<p class="overlay-kicker">Ready when you are</p><h2 class="overlay-title">Press an arrow<br>or tap to start</h2><p class="overlay-copy">The run waits until your first input.</p>';
+        overlay.hidden = false;
+        started = false;
+      }
+
+      function setPlayer(name) {
+        playerName = name.trim().slice(0, 18);
+        localStorage.setItem('pulsebound-player', playerName);
+        playerDisplay.textContent = playerName;
+        playerBadge.classList.add('visible');
+      }
+
+      function resize() {
+        const box = frame.getBoundingClientRect();
+        const ratio = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+        width = box.width;
+        height = box.height;
+        canvas.width = Math.round(width * ratio);
+        canvas.height = Math.round(height * ratio);
+        context.setTransform(ratio, 0, 0, ratio, 0, 0);
+        if (mode === 'cube') player.y = Math.min(player.y || floorY() - player.size, floorY() - player.size);
+        else player.y = Math.max(8, Math.min(player.y, height - player.size - 8));
+        player.x = Math.max(8, Math.min(player.x, width - player.size - 8));
+      }
+
+      function enterGameView() {
+        shell.classList.add('is-playing');
+        if (!document.fullscreenElement && shell.requestFullscreen) {
+          shell.requestFullscreen().catch(() => {});
+        }
+        overlay.innerHTML = '<p class="overlay-kicker">Ready when you are</p><h2 class="overlay-title">Press an arrow<br>or tap to start</h2><p class="overlay-copy">The run waits until your first input.</p>';
+        overlay.hidden = false;
+        started = false;
+        running = false;
+        requestAnimationFrame(resize);
+      }
+
+      function begin() {
+        started = true;
+        running = true;
+        dead = false;
+        mode = 'cube';
+        gravityDirection = 1;
+        transitionTime = 0;
+        portalTransition = null;
+        waveTrail = [];
+        inputHeld = false;
+        heldDirections.clear();
+        moveDirection = 0;
+        backgroundOffset = 0;
+        updateMoveDirection();
+        shell.classList.remove('wave-mode');
+        phaseLabel.textContent = 'Cube run / 01';
+        controlHint.innerHTML = 'TAP TO JUMP / HOLD &#x2190; &#x2192; TO MOVE';
+        score = 0;
+        speed = 300;
+        spawnIn = .7;
+        obstacles = [];
+        platforms = [];
+        floorGaps = [];
+        gravityPortals = [];
+        roofSpikes = [];
+        spikes = [];
+        enemies = [];
+        platformSpawnIn = .75;
+        floorGapSpawnIn = 3.2;
+        gravityPortalSpawnIn = 3.4;
+        spikeSpawnIn = 1.9;
+        particles = [];
+        player.y = floorY() - player.size - 120;
+        player.x = Math.min(92, width - player.size - 8);
+        player.velocity = 0;
+        player.grounded = false;
+        player.rotation = 0;
+        scoreLabel.textContent = '0000';
+        overlay.hidden = true;
+      }
+
+      function jump() {
+        if (!playerName) {
+          nameInput.focus();
+          return;
+        }
+        if (!started || dead) begin();
+        if (player.grounded) {
+          player.velocity = -470 * gravityDirection;
+          player.grounded = false;
+        }
+      }
+
+      function updateCubePhysics(delta) {
+        if (inputHeld && player.grounded) {
+          player.velocity = -470 * gravityDirection;
+          player.grounded = false;
+        }
+        const previousY = player.y;
+        player.grounded = false;
+        player.velocity += 1900 * gravityDirection * delta;
+        player.y += player.velocity * delta;
+
+        if (gravityDirection > 0) {
+          const playerCenter = player.x + player.size / 2;
+          const overGap = floorGaps.some((gap) => playerCenter >= gap.x && playerCenter <= gap.x + gap.width);
+          if (!overGap && player.y + player.size >= floorY()) {
+            player.y = floorY() - player.size;
+            player.velocity = 0;
+            player.grounded = true;
+          } else if (player.velocity >= 0) {
+            for (const platform of platforms) {
+              const overlapsPlatform = player.x + player.size - 4 > platform.x
+                && player.x + 4 < platform.x + platform.width;
+              if (overlapsPlatform && previousY + player.size <= platform.y && player.y + player.size >= platform.y) {
+                player.y = platform.y - player.size;
+                player.velocity = 0;
+                player.grounded = true;
+                break;
+              }
+            }
+          }
+          if (player.y > height + player.size) endRun();
+        } else if (player.y <= 8) {
+          player.y = 8;
+          player.velocity = 0;
+          player.grounded = true;
+        } else if (player.velocity <= 0) {
+          for (const platform of platforms) {
+            const overlapsPlatform = player.x + player.size - 4 > platform.x
+              && player.x + 4 < platform.x + platform.width;
+            if (overlapsPlatform && previousY >= platform.y + platform.height && player.y <= platform.y + platform.height) {
+              player.y = platform.y + platform.height;
+              player.velocity = 0;
+              player.grounded = true;
+              break;
+            }
+          }
+        }
+
+        if (!player.grounded) player.rotation += delta * 6.4;
+        else player.rotation = Math.round(player.rotation / (Math.PI / 2)) * (Math.PI / 2);
+      }
+
+      function updateMoveDirection() {
+        moveDirection = Number(heldDirections.has('right')) - Number(heldDirections.has('left'));
+        moveLeftButton.classList.toggle('is-held', heldDirections.has('left'));
+        moveRightButton.classList.toggle('is-held', heldDirections.has('right'));
+      }
+
+      for (const [button, direction] of [[moveLeftButton, 'left'], [moveRightButton, 'right']]) {
+        button.addEventListener('pointerdown', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          heldDirections.add(direction);
+          updateMoveDirection();
+          button.setPointerCapture(event.pointerId);
+        });
+        for (const eventName of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+          button.addEventListener(eventName, () => {
+            heldDirections.delete(direction);
+            updateMoveDirection();
+          });
+        }
+      }
+
+      form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const name = nameInput.value.trim();
+        if (!name) return;
+        setPlayer(name);
+        enterGameView();
+      });
+
+      restartButton.addEventListener('click', () => {
+        if (!playerName) {
+          nameInput.focus();
+          return;
+        }
+        begin();
+      });
+
+      menuButton.addEventListener('click', () => {
+        running = false;
+        started = false;
+        inputHeld = false;
+        heldDirections.clear();
+        updateMoveDirection();
+        portalTransition = null;
+        transitionTime = 0;
+        shell.classList.remove('wave-mode');
+        shell.classList.remove('is-playing');
+        overlay.innerHTML = '<p class="overlay-kicker">Ready when you are</p><h2 class="overlay-title">Your run<br>starts here</h2><p class="overlay-copy">Sign in with a player name to jump in. Your best run stays on this device.</p>';
+        overlay.hidden = false;
+        if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+      });
+
+      fullscreenButton.addEventListener('click', () => {
+        if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+        else if (shell.requestFullscreen) shell.requestFullscreen().catch(() => {});
+      });
+
+      window.addEventListener('keydown', (event) => {
+        if (['Space', 'ArrowUp', 'KeyW'].includes(event.code)) {
+          if (event.target.matches('input, textarea')) return;
+          event.preventDefault();
+          if (mode !== 'wave' && !event.repeat) jump();
+          inputHeld = true;
+          return;
+        }
+        if (['ArrowLeft', 'KeyA', 'ArrowRight', 'KeyD'].includes(event.code)) {
+          if (event.target.matches('input, textarea')) return;
+          event.preventDefault();
+          heldDirections.add(['ArrowLeft', 'KeyA'].includes(event.code) ? 'left' : 'right');
+          updateMoveDirection();
+        }
+      });
+      window.addEventListener('keyup', (event) => {
+        if (['Space', 'ArrowUp', 'KeyW'].includes(event.code)) inputHeld = false;
+        if (['ArrowLeft', 'KeyA'].includes(event.code)) heldDirections.delete('left');
+        if (['ArrowRight', 'KeyD'].includes(event.code)) heldDirections.delete('right');
+        updateMoveDirection();
+      });
+      shell.addEventListener('pointerdown', (event) => {
+        if (event.target.closest('button, input')) return;
+        if (!running || dead || mode === 'cube') jump();
+        inputHeld = true;
+      });
+      window.addEventListener('pointerup', () => { inputHeld = false; });
+      window.addEventListener('pointercancel', () => { inputHeld = false; });
+      window.addEventListener('blur', () => {
+        inputHeld = false;
+        heldDirections.clear();
+        updateMoveDirection();
+      });
+      window.addEventListener('resize', resize);
+      document.addEventListener('fullscreenchange', resize);
+      new ResizeObserver(resize).observe(frame);
+      resize();
+
+      function addBurst(x, y, color, count) {
+        for (let i = 0; i < count; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const force = 35 + Math.random() * 145;
+          particles.push({ x, y, vx: Math.cos(angle) * force, vy: Math.sin(angle) * force, life: .35 + Math.random() * .4, maxLife: .75, color, size: 2 + Math.random() * 3 });
+        }
+      }
+
+      function endRun() {
+        if (dead) return;
+        running = false;
+        dead = true;
+        addBurst(player.x + player.size / 2, player.y + player.size / 2, '#ff795c', 18);
+        if (score > best) {
+          best = score;
+          localStorage.setItem('pulsebound-best', String(best));
+          bestLabel.textContent = String(best).padStart(4, '0');
+        }
+        overlay.innerHTML = '<p class="overlay-kicker">' + (mode === 'wave' ? 'Wave cleared / ' : 'Run complete / ') + Math.floor(score) + 'm</p><h2 class="overlay-title">One more<br>try?</h2><p class="overlay-copy">Hold SPACE or press and hold the play field to retry.</p>';
+        overlay.hidden = false;
+      }
+
+      function startWave() {
+        const centerX = player.x + player.size / 2 + 68;
+        portalTransition = {
+          x: centerX,
+          y: height / 2,
+          startX: player.x,
+          startY: player.y,
+          duration: 1.45
+        };
+        heldDirections.clear();
+        moveDirection = 0;
+        updateMoveDirection();
+        inputHeld = false;
+        transitionTime = portalTransition.duration;
+        phaseLabel.textContent = 'Rift transit / 02';
+        controlHint.textContent = 'ENTERING THE RIFT';
+      }
+
+      function finishWaveTransition() {
+        mode = 'wave';
+        obstacles = [];
+        platforms = [];
+        spikes = [];
+        enemies = [];
+        spawnIn = .7;
+        player.x = Math.min(width - player.size - 8, portalTransition.x + 34);
+        player.y = height / 2 - player.size / 2;
+        player.velocity = 0;
+        player.rotation = 0;
+        phaseLabel.textContent = 'Space wave / 02';
+        controlHint.innerHTML = 'HOLD TO RISE / RELEASE TO FALL<br>Thread the opening.';
+        shell.classList.add('wave-mode');
+        waveTrail = [{ x: player.x + player.size / 2, y: player.y + player.size / 2, life: 1.6 }];
+        portalTransition = null;
+      }
+
+      function update(delta) {
+        if (running) {
+          const shouldScroll = moveDirection !== 0;
+          if (!shouldScroll && mode === 'cube' && transitionTime <= 0) {
+            speed = 0;
+            updateCubePhysics(delta);
+            for (const enemy of enemies) {
+              enemy.phase += delta * 4.2;
+              enemy.x = enemy.homeX + Math.sin(enemy.phase) * 48;
+              const overlapsEnemy = player.x + player.size - 4 > enemy.x
+                && player.x + 4 < enemy.x + enemy.size
+                && player.y + player.size - 4 > enemy.y
+                && player.y + 4 < enemy.y + enemy.size;
+              if (overlapsEnemy) endRun();
+            }
+            if (!player.grounded) player.rotation += delta * 6.4;
+            else player.rotation = Math.round(player.rotation / (Math.PI / 2)) * (Math.PI / 2);
+            return;
+          }
+          if (transitionTime > 0) {
+            transitionTime = Math.max(0, transitionTime - delta);
+            if (portalTransition) {
+              const progress = 1 - transitionTime / portalTransition.duration;
+              const eased = progress * progress * (3 - 2 * progress);
+              const targetX = Math.min(width - player.size - 8, portalTransition.x - player.size / 2);
+              const targetY = portalTransition.y - player.size / 2;
+              player.x = portalTransition.startX + (targetX - portalTransition.startX) * eased;
+              player.y = portalTransition.startY + (targetY - portalTransition.startY) * eased;
+              player.rotation = progress * Math.PI * 2;
+            }
+            if (transitionTime <= 0 && portalTransition) finishWaveTransition();
+          } else {
+            score += delta * speed * .045;
+            speed = mode === 'cube'
+              ? Math.min(740, 380 + score * .14)
+              : Math.min(740, 400 + (score - 240) * .12);
+            scoreLabel.textContent = String(Math.floor(score)).padStart(4, '0');
+            if (mode === 'cube' && score >= 240) {
+              startWave();
+            } else if (mode === 'cube') {
+              const horizontalSpeed = speed + 340;
+              backgroundOffset += moveDirection * horizontalSpeed * delta;
+              const worldShift = moveDirection * horizontalSpeed * delta;
+              for (const platform of platforms) platform.x -= worldShift;
+              for (const spike of spikes) spike.x -= worldShift;
+              for (const spike of roofSpikes) spike.x -= worldShift;
+              for (const gap of floorGaps) gap.x -= worldShift;
+              for (const portal of gravityPortals) portal.x -= worldShift;
+              for (const enemy of enemies) {
+                enemy.homeX -= worldShift + moveDirection * 38 * delta;
+                enemy.phase += delta * 4.2;
+                enemy.x = enemy.homeX + Math.sin(enemy.phase) * 48;
+              }
+              platformSpawnIn -= delta;
+              if (platformSpawnIn <= 0) {
+                const count = 3 + Math.floor(Math.random() * 2);
+                const firstY = floorY() - (42 + Math.random() * 8);
+                const gap = 18 + Math.random() * 8;
+                let nextX = width + 30;
+                for (let index = 0; index < count; index++) {
+                  const platform = {
+                    x: nextX,
+                    y: firstY - index * (15 + Math.random() * 5),
+                    width: 88 + Math.random() * 18,
+                    height: 13
+                  };
+                  platforms.push(platform);
+                  if (index === count - 1 && Math.random() < .8) {
+                    const enemyX = platform.x + platform.width * .58;
+                    enemies.push({ x: enemyX, homeX: enemyX, y: platform.y - 27, size: 27, phase: Math.random() * Math.PI * 2 });
+                  }
+                  nextX += platform.width + gap;
+                }
+                platformSpawnIn = Math.max(1.5, 2.9 - score / 900) + Math.random() * .5;
+              }
+              floorGapSpawnIn -= delta;
+              if (floorGapSpawnIn <= 0) {
+                const gapX = width + 50;
+                const gapWidth = 240 + Math.random() * 90;
+                floorGaps.push({ x: gapX, width: gapWidth });
+                const bridgeWidth = Math.min(120, Math.max(66, gapWidth * .42));
+                platforms.push({
+                  x: gapX + gapWidth * .5 - bridgeWidth * .5,
+                  y: floorY() - 48,
+                  width: bridgeWidth,
+                  height: 12,
+                  temporary: true,
+                  life: 2.5,
+                  maxLife: 2.5
+                });
+                floorGapSpawnIn = 5.2 + Math.random() * 2.4;
+              }
+              gravityPortalSpawnIn -= delta;
+              if (gravityPortalSpawnIn <= 0) {
+                gravityPortals.push({
+                  x: width + 70,
+                  y: gravityDirection > 0 ? floorY() - 34 : 12,
+                  size: 40,
+                  phase: Math.random() * Math.PI * 2
+                });
+                gravityPortalSpawnIn = 8 + Math.random() * 2.5;
+              }
+              spikeSpawnIn -= delta;
+              if (spikeSpawnIn <= 0) {
+                const count = 1 + Math.floor(Math.random() * 3);
+                for (let index = 0; index < count; index++) {
+                  spikes.push({ x: width + 24 + index * 30, width: 28, height: 27 });
+                }
+                spikeSpawnIn = 2.4 + Math.random() * 1.8;
+              }
+              if (gravityDirection < 0) {
+                const roofSpikeX = width + 32;
+                if (Math.random() < 0.032) {
+                  roofSpikes.push({ x: roofSpikeX, width: 34, height: 26, y: 12 });
+                }
+              }
+              platforms = platforms.filter((platform) => {
+                if (platform.temporary) {
+                  platform.life -= delta;
+                  return platform.life > 0 && platform.x + platform.width > 0 && platform.x < width + 200;
+                }
+                return platform.x + platform.width > 0 && platform.x < width + 200;
+              });
+              spikes = spikes.filter((spike) => spike.x + spike.width > 0 && spike.x < width + 200);
+              floorGaps = floorGaps.filter((gap) => gap.x + gap.width > 0 && gap.x < width + 200);
+              gravityPortals = gravityPortals.filter((portal) => portal.x + portal.size > 0 && portal.x < width + 200);
+              roofSpikes = roofSpikes.filter((spike) => spike.x + spike.width > 0 && spike.x < width + 200);
+              enemies = enemies.filter((enemy) => enemy.x + enemy.size > 0 && enemy.x < width + 200);
+              for (const portal of gravityPortals) {
+                const overlapsPortal = player.x + player.size > portal.x
+                  && player.x < portal.x + portal.size
+                  && player.y + player.size > portal.y
+                  && player.y < portal.y + portal.size;
+                if (overlapsPortal) {
+                  gravityDirection *= -1;
+                  player.velocity = 0;
+                  player.grounded = false;
+                  portal.collected = true;
+                  break;
+                }
+              }
+              gravityPortals = gravityPortals.filter((portal) => !portal.collected);
+              updateCubePhysics(delta);
+              for (const spike of spikes) {
+                const overlapsSpike = player.x + player.size - 5 > spike.x
+                  && player.x + 5 < spike.x + spike.width
+                  && player.y + player.size - 4 > floorY() - spike.height;
+                if (overlapsSpike) endRun();
+              }
+              for (const enemy of enemies) {
+                const overlapsEnemy = player.x + player.size - 4 > enemy.x
+                  && player.x + 4 < enemy.x + enemy.size
+                  && player.y + player.size - 4 > enemy.y
+                  && player.y + 4 < enemy.y + enemy.size;
+                if (overlapsEnemy) endRun();
+              }
+              if (gravityDirection < 0) {
+                for (const spike of roofSpikes) {
+                  const overlapsRoofSpike = player.x + player.size - 5 > spike.x
+                    && player.x + 5 < spike.x + spike.width
+                    && player.y + 4 < spike.y + spike.height
+                    && player.y + player.size - 4 > spike.y;
+                  if (overlapsRoofSpike) endRun();
+                }
+              }
+              if (!player.grounded) player.rotation += delta * 6.4;
+              else player.rotation = Math.round(player.rotation / (Math.PI / 2)) * (Math.PI / 2);
+
+            } else {
+              player.velocity = inputHeld ? -440 : 440;
+              player.y += player.velocity * delta;
+              player.rotation = inputHeld ? -.55 : .55;
+              waveTrail.push({ x: player.x + player.size / 2, y: player.y + player.size / 2, life: 1.6 });
+              if (player.y < 0 || player.y + player.size > height) endRun();
+
+              spawnIn -= delta;
+              if (spawnIn <= 0) {
+                const gapHeight = Math.max(104, height * .29);
+                const gapTop = 34 + Math.random() * Math.max(1, height - gapHeight - 68);
+                const gateWidth = 52;
+                obstacles.push({ x: width + 20, y: 0, width: gateWidth, height: gapTop, type: 'gate' });
+                obstacles.push({ x: width + 20, y: gapTop + gapHeight, width: gateWidth, height: height - gapTop - gapHeight, type: 'gate' });
+                spawnIn = Math.max(.58, .98 - (score - 240) / 2200) + Math.random() * .14;
+              }
+              for (const obstacle of obstacles) {
+                obstacle.x -= speed * delta;
+                const overlapsX = player.x + player.size - 4 > obstacle.x
+                  && player.x + 4 < obstacle.x + obstacle.width;
+                const overlapsY = player.y + player.size - 4 > obstacle.y
+                  && player.y + 4 < obstacle.y + obstacle.height;
+                if (overlapsX && overlapsY) endRun();
+              }
+              obstacles = obstacles.filter((obstacle) => obstacle.x > -obstacle.width);
+            }
+          }
+        }
+        for (const point of waveTrail) point.life -= delta;
+        waveTrail = waveTrail.filter((point) => point.life > 0);
+        particles = particles.filter((particle) => particle.life > 0);
+        for (const particle of particles) {
+          particle.life -= delta;
+          particle.x += particle.vx * delta;
+          particle.y += particle.vy * delta;
+          particle.vy += 340 * delta;
+        }
+      }
+
+      function draw(time) {
+        const isActive = running || (started && !dead);
+        context.clearRect(0, 0, width, height);
+        const ground = floorY();
+        const waveMix = mode === 'wave' ? 1 : portalTransition ? 1 - transitionTime / portalTransition.duration : 0;
+        const backgroundRed = Math.round(22 - waveMix);
+        const backgroundGreen = Math.round(30 - waveMix);
+        const backgroundBlue = Math.round(31 + waveMix * 6);
+        context.fillStyle = `rgb(${backgroundRed},${backgroundGreen},${backgroundBlue})`;
+        context.fillRect(0, 0, width, height);
+
+        context.strokeStyle = 'rgba(215,255,87,.055)';
+        context.lineWidth = 1;
+        const grid = 40;
+        const drift = isActive ? ((backgroundOffset % grid) + grid) % grid : 0;
+        const gridHeight = ground + (height - ground) * waveMix;
+        for (let x = -drift; x < width; x += grid) {
+          context.beginPath(); context.moveTo(x, 0); context.lineTo(x, gridHeight); context.stroke();
+        }
+        for (let y = ground % grid * (1 - waveMix); y < gridHeight; y += grid) {
+          context.beginPath(); context.moveTo(0, y); context.lineTo(width, y); context.stroke();
+        }
+
+        const pulse = isActive && !reducedMotion.matches ? Math.sin(time / 180) * 4 : 0;
+        if (waveMix < 1) {
+          context.globalAlpha = 1 - waveMix;
+          context.fillStyle = '#212d2b';
+          context.fillStyle = '#d7ff57';
+          const drawFloorSegment = (left, right) => {
+            if (right <= left) return;
+            context.fillStyle = '#212d2b';
+            context.fillRect(left, ground, right - left, height - ground);
+            context.fillStyle = '#d7ff57';
+            context.fillRect(left, ground, right - left, 2);
+            context.fillStyle = 'rgba(215,255,87,.23)';
+            context.fillRect(left, ground + 2, right - left, 2 + pulse / 2);
+          };
+          let floorSegmentStart = 0;
+          const sortedGaps = [...floorGaps].sort((left, right) => left.x - right.x);
+          for (const gap of sortedGaps) {
+            const gapStart = Math.max(0, gap.x);
+            const gapEnd = Math.min(width, gap.x + gap.width);
+            drawFloorSegment(floorSegmentStart, gapStart);
+            floorSegmentStart = Math.max(floorSegmentStart, gapEnd);
+          }
+          drawFloorSegment(floorSegmentStart, width);
+        }
+        if (waveMix > 0) {
+          context.globalAlpha = waveMix;
+          context.fillStyle = 'rgba(215,255,87,.35)';
+          context.fillRect(0, 8, width, 2);
+          context.fillRect(0, height - 10, width, 2);
+        }
+        if (mode === 'cube' && gravityDirection < 0) {
+          context.globalAlpha = 1;
+          context.fillStyle = '#212d2b';
+          context.fillRect(0, 0, width, 8);
+          context.fillStyle = '#d7ff57';
+          context.fillRect(0, 8, width, 2);
+        }
+        context.globalAlpha = 1;
+
+        if (mode === 'cube') {
+          context.globalAlpha = 1 - waveMix;
+          for (const platform of platforms) {
+            if (platform.temporary) {
+              const warning = 1 - platform.life / platform.maxLife;
+              const pulse = reducedMotion.matches ? 0 : Math.sin(time / 90 + platform.x * 0.08) * 0.2;
+              context.globalAlpha = Math.max(0.28, 0.9 - warning * 0.65 + pulse);
+              context.fillStyle = '#f7c86d';
+              context.fillRect(platform.x, platform.y, platform.width, platform.height);
+              context.fillStyle = '#fff6d7';
+              context.fillRect(platform.x, platform.y, platform.width, 3);
+              context.strokeStyle = warning > 0.55 ? '#ff5b5b' : '#ffd06b';
+              context.lineWidth = warning > 0.55 ? 2.6 : 1.4;
+              context.strokeRect(platform.x + 1.5, platform.y + 1.5, platform.width - 3, platform.height - 3);
+              context.globalAlpha = 1;
+            } else {
+              context.globalAlpha = 1;
+              context.fillStyle = '#ff795c';
+              context.fillRect(platform.x, platform.y, platform.width, platform.height);
+              context.fillStyle = '#ffd0a8';
+              context.fillRect(platform.x, platform.y, platform.width, 3);
+              context.fillStyle = '#d95345';
+              context.fillRect(platform.x + 8, platform.y + 6, platform.width - 16, 3);
+            }
+          }
+          for (const portal of gravityPortals) {
+            const centerX = portal.x + portal.size / 2;
+            const centerY = portal.y + portal.size / 2;
+            const ringPulse = reducedMotion.matches ? 0 : Math.sin(time / 150 + portal.phase) * 3;
+            context.save();
+            context.shadowColor = '#5ab8ed';
+            context.shadowBlur = 18;
+            context.fillStyle = 'rgba(90,184,237,.18)';
+            context.strokeStyle = '#a5e2ff';
+            context.lineWidth = 3;
+            context.beginPath();
+            context.arc(centerX, centerY, portal.size / 2 + ringPulse, 0, Math.PI * 2);
+            context.fill();
+            context.stroke();
+            context.shadowBlur = 0;
+            context.strokeStyle = '#d7ff57';
+            context.lineWidth = 2;
+            context.beginPath();
+            context.ellipse(centerX, centerY, portal.size / 2 - 6, portal.size / 2 - 12, time / 500 + portal.phase, 0, Math.PI * 2);
+            context.stroke();
+            context.restore();
+          }
+          for (const spike of spikes) {
+            context.fillStyle = '#ff795c';
+            context.strokeStyle = '#ffd0a8';
+            context.lineWidth = 2;
+            context.beginPath();
+            context.moveTo(spike.x, floorY());
+            context.lineTo(spike.x + spike.width / 2, floorY() - spike.height);
+            context.lineTo(spike.x + spike.width, floorY());
+            context.closePath();
+            context.fill();
+            context.stroke();
+          }
+          for (const spike of roofSpikes) {
+            context.fillStyle = '#ff795c';
+            context.strokeStyle = '#ffd0a8';
+            context.lineWidth = 2;
+            context.beginPath();
+            context.moveTo(spike.x, 4);
+            context.lineTo(spike.x + spike.width / 2, spike.height + 4);
+            context.lineTo(spike.x + spike.width, 4);
+            context.closePath();
+            context.fill();
+            context.stroke();
+          }
+          for (const enemy of enemies) {
+            const bob = reducedMotion.matches ? 0 : Math.sin(time / 105 + enemy.phase) * 2;
+            const enemyY = enemy.y + bob;
+            context.fillStyle = '#5ab8ed';
+            context.fillRect(enemy.x, enemyY, enemy.size, enemy.size);
+            context.fillStyle = '#a5e2ff';
+            context.fillRect(enemy.x + 3, enemyY + 3, enemy.size - 6, 4);
+            context.fillStyle = '#183548';
+            context.fillRect(enemy.x + 6, enemyY + 10, 4, 5);
+            context.fillRect(enemy.x + enemy.size - 10, enemyY + 10, 4, 5);
+            context.lineWidth = 2;
+            context.beginPath();
+            context.moveTo(enemy.x + 6, enemyY + 9);
+            context.lineTo(enemy.x + 11, enemyY + 11);
+            context.moveTo(enemy.x + enemy.size - 6, enemyY + 9);
+            context.lineTo(enemy.x + enemy.size - 11, enemyY + 11);
+            context.moveTo(enemy.x + 8, enemyY + 22);
+            context.quadraticCurveTo(enemy.x + enemy.size / 2, enemyY + 17, enemy.x + enemy.size - 8, enemyY + 22);
+            context.stroke();
+          }
+          context.globalAlpha = 1;
+        }
+
+        for (const obstacle of obstacles) {
+          const x = obstacle.x;
+          context.fillStyle = '#ff795c';
+          if (obstacle.type === 'gate') {
+            context.fillRect(x, obstacle.y, obstacle.width, obstacle.height);
+            context.fillStyle = '#ffb08a';
+            context.fillRect(x + 5, obstacle.y + 5, 3, Math.max(0, obstacle.height - 10));
+            context.fillStyle = 'rgba(255,121,92,.24)';
+            for (let y = obstacle.y + 15; y < obstacle.y + obstacle.height; y += 20) {
+              context.fillRect(x + 13, y, obstacle.width - 17, 2);
+            }
+          }
+        }
+
+        if (portalTransition && transitionTime > 0) {
+          const progress = 1 - transitionTime / portalTransition.duration;
+          const radius = 18 + progress * 58;
+          context.save();
+          context.globalAlpha = 1 - progress * .25;
+          context.shadowColor = '#5ab8ed';
+          context.shadowBlur = 22;
+          context.fillStyle = 'rgba(90,184,237,.16)';
+          context.strokeStyle = '#a5e2ff';
+          context.lineWidth = 4;
+          context.beginPath();
+          context.arc(portalTransition.x, portalTransition.y, radius, 0, Math.PI * 2);
+          context.fill();
+          context.stroke();
+          context.shadowBlur = 0;
+          context.strokeStyle = 'rgba(215,255,87,.85)';
+          context.lineWidth = 2;
+          context.beginPath();
+          context.ellipse(portalTransition.x, portalTransition.y, radius + 9, radius * .72, progress * 1.7, 0, Math.PI * 2);
+          context.stroke();
+          context.restore();
+        }
+
+        if (mode === 'wave' && waveTrail.length > 1) {
+          context.save();
+          context.lineCap = 'round';
+          context.lineWidth = 4;
+          for (let index = 1; index < waveTrail.length; index++) {
+            const previous = waveTrail[index - 1];
+            const point = waveTrail[index];
+            context.globalAlpha = Math.min(previous.life, point.life) / 1.6;
+            context.strokeStyle = '#a5e2ff';
+            context.beginPath();
+            context.moveTo(previous.x, previous.y);
+            context.lineTo(point.x, point.y);
+            context.stroke();
+          }
+          context.restore();
+        }
+
+        if (!dead || particles.length === 0) {
+          context.save();
+          context.translate(player.x + player.size / 2, player.y + player.size / 2);
+          context.rotate(player.rotation);
+          if (mode === 'wave') {
+            context.fillStyle = '#d7ff57';
+            context.strokeStyle = '#f0f1df';
+            context.lineWidth = 2;
+            context.beginPath();
+            context.moveTo(player.size / 2 + 3, 0);
+            context.lineTo(-player.size / 2, -player.size / 2);
+            context.lineTo(-player.size / 2, player.size / 2);
+            context.closePath();
+            context.fill();
+            context.stroke();
+          } else {
+            context.fillStyle = '#d7ff57';
+            context.fillRect(-player.size / 2, -player.size / 2, player.size, player.size);
+            context.strokeStyle = '#f0f1df';
+            context.lineWidth = 2;
+            context.strokeRect(-player.size / 2 + 1, -player.size / 2 + 1, player.size - 2, player.size - 2);
+            context.fillStyle = '#26312a';
+            context.fillRect(-8, -6, 5, 7);
+            context.fillRect(4, -6, 5, 7);
+            context.fillRect(-7, 6, 14, 3);
+          }
+          context.restore();
+        }
+        for (const particle of particles) {
+          context.globalAlpha = Math.max(0, particle.life / particle.maxLife);
+          context.fillStyle = particle.color;
+          context.fillRect(particle.x, particle.y, particle.size, particle.size);
+        }
+        context.globalAlpha = 1;
+      }
+
+      function loop(time) {
+        const delta = Math.min(.035, (time - lastTime) / 1000 || 0);
+        lastTime = time;
+        update(delta);
+        draw(time);
+        requestAnimationFrame(loop);
+      }
+      requestAnimationFrame(loop);
+    })();
+  </script>
+</body>
+</html>
