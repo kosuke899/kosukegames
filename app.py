@@ -1,15 +1,11 @@
 import streamlit as st
+from pathlib import Path
 
 st.set_page_config(page_title="Kosuke Game", layout="wide")
 
-st.title("Kosuke Game")
+html_path = Path(__file__).resolve().parent / "index.html"
 
-st.write("This is the Streamlit entry file for the game.")
+with html_path.open("r", encoding="utf-8") as f:
+    html = f.read()
 
-st.markdown(
-    """
-    This app currently acts as the Python entry point for deployment.
-    The actual game logic from the HTML file would need to be migrated here
-    or embedded using a Streamlit component.
-    """
-)
+st.components.v1.html(html, height=900, scrolling=True)
